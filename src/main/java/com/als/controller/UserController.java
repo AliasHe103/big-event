@@ -9,27 +9,27 @@ import com.als.utils.ThreadLocalUtil;
 import jakarta.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
 @Validated
 public class UserController {
-
     @Autowired
     private UserService userService;
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
     @RequestMapping("/register")
     public Result register(@Pattern(regexp = "^\\S{5,16}$") String username, @Pattern(regexp = "^\\S{5,16}$") String password) {
-//        if (username != null && username.length() >= 5 && username.length() <= 16 &&
-//            password != null && password.length() >= 5 && password.length() <= 16
-//        ) {
-//
-//        }
         //查询用户是否存在
         User u = userService.findByUsername(username);
         if (u == null) {
@@ -57,6 +57,8 @@ public class UserController {
             claims.put("id", loginUser.getId());
             claims.put("username", loginUser.getUsername());
             String token = JwtUtil.genToken(claims);
+            ValueOperations<String, String> ops = redisTemplate.opsForValue();
+            ops.set(token, token, 1, TimeUnit.HOURS);
             return Result.success(token);
         }
 
@@ -65,8 +67,6 @@ public class UserController {
 
     @GetMapping("/userInfo")
     public Result<User> userInfo(/*@RequestHeader(name = "Authorization") String token*/) {
-//        Map<String, Object> map = JwtUtil.parseToken(token);
-//        String username = (String) map.get("username");
         Map<String, Object> map = ThreadLocalUtil.get();
         String username = (String) map.get("username");
         User user = userService.findByUsername(username);
@@ -86,7 +86,7 @@ public class UserController {
     }
 
     @PatchMapping("/updatePassword")
-    public Result updatePassword(@RequestBody Map<String, String> params) {
+    public Result updatePassword(@RequestBody Map<String, String> params, @RequestHeader("Authorization") String token) {
         //校验参数
         String oldPwd = params.get("old_pwd");
         String newPwd = params.get("new_pwd");
@@ -110,6 +110,10 @@ public class UserController {
         }
 
         userService.updatePassword(newPwd);
+        //redis中删除过期token
+        ValueOperations<String, String> ops = redisTemplate.opsForValue();
+        ops.getOperations().delete(token);
+
         return Result.success();
     }
 }
