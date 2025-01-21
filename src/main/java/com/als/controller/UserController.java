@@ -88,9 +88,9 @@ public class UserController {
     @PatchMapping("/updatePassword")
     public Result updatePassword(@RequestBody Map<String, String> params, @RequestHeader("Authorization") String token) {
         //校验参数
-        String oldPwd = params.get("old_pwd");
-        String newPwd = params.get("new_pwd");
-        String rePwd = params.get("re_pwd");
+        String oldPwd = params.get("oldPassword");
+        String newPwd = params.get("newPassword");
+        String rePwd = params.get("repeatPassword");
 
         if (!StringUtils.hasLength(oldPwd) || !StringUtils.hasLength(newPwd) || !StringUtils.hasLength(rePwd)) {
             return Result.error("参数错误");
